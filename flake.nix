@@ -3,22 +3,23 @@
   inputs = {
     utils.url = "github:numtide/flake-utils/v1.0.0";
     nixpkgs.url = "github:NixOS/nixpkgs/24.05";
+    flake-compat.url = "https://flakehub.com/f/edolstra/flake-compat/1.tar.gz";
   };
 
-  outputs = { self, nixpkgs, utils }:
+  outputs = { self, nixpkgs, utils, ... }:
     utils.lib.eachDefaultSystem(
       system:
         let
           pkgs = nixpkgs.legacyPackages.${system};
         in {
-          apps.default = {
+          apps.default = repo: {
             type = "app";
 
             program =
               let
                 caddyFile = pkgs.writeText "Caddyfile" ''
                   :8080 {
-                      root * ${self.packages."${system}".default}/public/
+                      root * ${self.packages."${system}".default repo}/public/
                       file_server
                       try_files {path} {path}.html {path}/ =404
                   }
@@ -48,7 +49,7 @@
             ];
           };
           packages = rec {
-            default = pkgs.buildNpmPackage rec {
+            default = repo: pkgs.buildNpmPackage rec {
               pname = "quartz";
               version = "4.3.1";
 
@@ -73,11 +74,14 @@
                 # Copy our website content
                 rm -r ./content
                 mkdir content
-                cp -r ${./content}/* ./content
+                cp -r ${repo}/content/* ./content/
+
+                mkdir .git
+                cp -r ${repo}/.git/* ./.git/
 
                 # Override quartz source files
                 mv ./quartz/components/index.ts ./quartz/components/index-original.ts
-                cp -r ${./quartz}/* ./
+                cp -r ${repo}/quartz/* ./
 
                 $out/bin/quartz build
                 mv public/ $out/public/
